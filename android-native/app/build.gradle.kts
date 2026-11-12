@@ -53,4 +53,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     // UniFFI's Kotlin calls the engine through JNA.
     implementation("net.java.dev.jna:jna:5.15.0@aar")
+
+    // ==== fusion 新增（均为普通库，不需要新 Gradle 插件） ====
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")                 // gateway 客户端
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7") // AI 页状态
 }

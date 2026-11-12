@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- fusion 新增：AI 生成页要访问局域网里的 fusion-gateway -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="Concat Spike"
+        android:label="Concat Fusion"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".MainActivity"
@@ -13,5 +15,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- fusion 新增：AI 一键成片入口页 -->
+        <activity
+            android:name="app.concat.editor.aicut.AiActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>

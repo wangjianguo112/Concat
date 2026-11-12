@@ -51,6 +51,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import app.concat.editor.aicut.AiActivity
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -149,6 +152,12 @@ private fun Editor(
         }
     }
 
+    // fusion: AI 生成页带回的成片 → 直接走 importFile（= engine.importVideo）
+    val aiLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val path = result.data?.getStringExtra("imported_path")
+        if (path != null) scope.launch { importFile(File(path)) }
+    }
+
     // The playhead and the numbers, read from the engine at the display's pace.
     LaunchedEffect(Unit) {
         while (true) {
@@ -205,6 +214,10 @@ private fun Editor(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val context = LocalContext.current
+            Button(onClick = { aiLauncher.launch(Intent(context, AiActivity::class.java)) }) {
+                Text("AI 成片")
+            }
             Button(onClick = {
                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
             }) { Text("Import") }
