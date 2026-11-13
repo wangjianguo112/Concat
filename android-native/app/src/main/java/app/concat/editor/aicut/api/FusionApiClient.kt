@@ -1,5 +1,6 @@
 package app.concat.editor.aicut.api
 
+import app.concat.editor.aicut.ui.FusionConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
