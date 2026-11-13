@@ -1,0 +1,103 @@
+name: fusion app
+
+# fusion: builds the android-native Gradle app (the concat-spike Kotlin shell
+# carrying the aicut AI entry) into an installable APK with dex. The shipping
+# mobile.yml builds the cargo-apk Slint app only — an APK with no code — so the
+# fusion features must be compiled through this workflow instead. The env
+# steps mirror mobile.yml's Android arm64 job; the cache keys match exactly,
+# so FFmpeg and the Rust build land on what those runs already saved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The ref to build
+        default: fusion/aicut-m1
+
+env:
+  CARGO_TERM_COLOR: always
+  GGML_NATIVE: "OFF"
+
+jobs:
+  fusion-spike:
+    name: Concat Fusion (arm64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: The pinned toolchain
+        id: toolchain
+        run: echo "channel=$(sed -n 's/^channel = "\(.*\)"/\1/p' src/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (v1), 2026-10-09
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: aarch64-linux-android
+      # build-rust.sh drives the engine build through cargo-ndk.
+      - uses: taiki-e/cache-cargo-install-action@9ee83daaa7b96a6fab930949ecf1122bba04a389 # v3.0.8
+        with:
+          tool: cargo-ndk
+
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y cmake libclang-dev
+
+      # Same cache keys as mobile.yml's arm64 job, so the FFmpeg build and the
+      # Rust artifacts those runs saved are picked up here.
+      - name: FFmpeg for Android (cached)
+        id: ffmpeg
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/vendor/ffmpeg/aarch64-linux-android
+          key: ffmpeg-aarch64-linux-android-${{ hashFiles('src/scripts/ffmpeg-mobile.sh') }}
+      - name: FFmpeg for Android
+        if: steps.ffmpeg.outputs.cache-hit != 'true'
+        run: src/scripts/ffmpeg-mobile.sh aarch64-linux-android
+      - name: FFmpeg for Android (save)
+        if: steps.ffmpeg.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src/vendor/ffmpeg/aarch64-linux-android
+          key: ${{ steps.ffmpeg.outputs.cache-primary-key }}
+
+      - name: Android libraries
+        run: src/scripts/android-libs.sh aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src
+          key: aarch64-linux-android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # AGP wants the NDK version pinned in app/build.gradle.kts.
+      - name: NDK for Gradle
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" >/dev/null
+
+      # The engine .so and the UniFFI Kotlin bindings, into jniLibs/ and java/.
+      - name: Build the engine and bindings
+        working-directory: android-native
+        run: ./build-rust.sh release
+
+      # The release build signs with the debug key, so it installs as-is.
+      - name: Build the APK
+        working-directory: android-native
+        run: ./gradlew :app:assembleRelease --no-daemon 2>&1 | tee gradle.log
+
+      - name: Stage
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' src/Cargo.toml | head -1)
+          mkdir stage
+          cp android-native/app/build/outputs/apk/release/app-release.apk \
+             "stage/Concat-fusion-$version-android-arm64.apk"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Concat-fusion-android-arm64
+          path: stage/
