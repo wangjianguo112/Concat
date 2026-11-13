@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.concat.editor.aicut.api.FusionApiClient
 
 /**
  * AI 一键成片页（方案 §4，链路 ①→④ 全在云端，⑤ 下载到本地由 MainActivity 调
